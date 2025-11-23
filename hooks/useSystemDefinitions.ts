@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { BaseDefinition } from '../types';
 
@@ -31,22 +31,26 @@ export const useSystemDefinitions = () => {
     fetchDefinitions();
   }, [fetchDefinitions]);
 
-  // --- Derived State Helpers ---
+  // --- Derived State Helpers (Memoized) ---
 
   // Get all departments
-  const departments = definitions.filter(d => d.category === 'department');
+  const departments = useMemo(() => 
+    definitions.filter(d => d.category === 'department'), 
+  [definitions]);
 
   // Get all jobs (can filter by deptId if provided)
-  const getJobs = (deptId?: string) => {
+  const getJobs = useCallback((deptId?: string) => {
     const jobs = definitions.filter(d => d.category === 'job_title');
     if (deptId) {
       return jobs.filter(j => j.parent_id === deptId);
     }
     return jobs;
-  };
+  }, [definitions]);
 
   // Get all KPIs
-  const kpis = definitions.filter(d => d.category === 'evaluation_kpi');
+  const kpis = useMemo(() => 
+    definitions.filter(d => d.category === 'evaluation_kpi'), 
+  [definitions]);
 
   // --- CRUD Actions ---
   
