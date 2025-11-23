@@ -511,7 +511,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
   ];
 
   // Dynamic Options based on Calendar Type
-  const uniqueDataYears = new Set(eventsData.map(e => {
+  const uniqueDataYears = new Set<string>(eventsData.map(e => {
       const dateStr = calendarType === 'shamsi' ? e.date : e.dateLunar;
       return dateStr.split('/')[0];
   }));

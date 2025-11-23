@@ -23,6 +23,67 @@ export enum ViewMode {
   EDIT = 'EDIT'
 }
 
+// --- NEW DB SCHEMA TYPES ---
+
+export interface BaseDefinition {
+  id: string;
+  title: string;
+  category: 'department' | 'job_title' | 'evaluation_kpi';
+  parent_id?: string | null;
+  created_at?: string;
+}
+
+export interface StaffMember {
+  id: string;
+  created_at?: string;
+  
+  // Tab 1: Identity & Work
+  full_name: string;
+  father_name?: string;
+  gender?: 'Male' | 'Female';
+  birth_date?: string;
+  national_id?: string;
+  id_number?: string; // Shenasname
+  
+  personnel_code?: string;
+  department_id: string;
+  job_title_id: string;
+  role_category?: string; // e.g., 'Medical', 'Nursing', 'Admin', 'Service'
+  employment_type?: string; // e.g., 'Official', 'Contract', 'Project'
+  status?: 'Active' | 'Inactive' | 'Retired' | 'Suspended';
+  hired_date?: string;
+  left_date?: string;
+
+  // Tab 2: Contact & Education
+  mobile_number?: string;
+  internal_phone?: string;
+  email?: string;
+  home_address?: string;
+  
+  education_level?: string; // Diploma, Bachelor, Master, PhD, Specialist, Sub-Specialist
+  major?: string;
+  university?: string;
+
+  // Tab 3: HR & Confidential
+  marital_status?: 'Single' | 'Married';
+  military_status?: string;
+  notes?: string;
+  
+  avatar_url?: string;
+  is_active: boolean;
+}
+
+export interface StaffEvaluation {
+  id: string;
+  staff_id: string;
+  period: string; // e.g., '1402-Q1'
+  evaluation_date: string;
+  total_score: number; // 0-100
+  scores: Record<string, number>; // JSONB: { "kpi_id": score }
+  evaluator_name: string;
+  notes?: string;
+}
+
 // --- Financial Module Types ---
 
 export interface Attachment {
@@ -268,6 +329,14 @@ export const INITIAL_TREE_DATA: NavNode[] = [
           { id: 'g7-9', label: 'ساختار' }
         ]
       }
+    ]
+  },
+  {
+    id: 'grp-admin',
+    label: 'مدیریت سیستم',
+    type: 'group',
+    children: [
+        { id: 'admin-definitions', label: 'تنظیمات پایه' }
     ]
   }
 ];

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { WikiArticle } from '../types';
-import { Bookmark, ChevronDown, ChevronUp, Info, Users, Package, Activity, Calendar, FileText, Filter, Scale, ShieldCheck, ClipboardList, History, Map, Target, Edit2, Check } from 'lucide-react';
-import HumanCapitalView from './HumanCapitalView';
+import { Bookmark, ChevronDown, ChevronUp, Info, Users, Package, Activity, Calendar, FileText, Filter, Scale, ShieldCheck, ClipboardList, History, Map, Target, Edit2, Check, Settings } from 'lucide-react';
+import UniversalStaffList from './HumanCapitalView';
 import FinancialAnalysisView from './FinancialAnalysisView';
 import TimelineView from './TimelineView';
 import PhysicalResourcesView from './PhysicalResourcesView';
@@ -10,6 +10,7 @@ import HomeDashboard from './HomeDashboard';
 import MacroFinancialView from './MacroFinancialView';
 import EvolutionTimeline from './EvolutionTimeline';
 import OrgChartView from './OrgChartView';
+import SystemDefinitionsView from './SystemDefinitionsView';
 
 interface SubArticleData {
   id: string;
@@ -29,7 +30,7 @@ interface ArticleViewProps {
 
 const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: propIsEditing = false, subArticles, onEditSubArticle, activeSectionId, onNavigate }) => {
   
-  // --- 1. Tab Mapping Logic ---
+  // --- Tab Mapping Logic ---
   const departmentTabs = useMemo(() => {
     const safeSubArticles = subArticles || [];
     return {
@@ -72,15 +73,17 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
       return !!(positionTabs.ecosystem || positionTabs.legal || positionTabs.charter);
   }, [positionTabs]);
 
-  // --- 2. State ---
+  // --- State ---
   const [activeTabId, setActiveTabId] = useState<string>('intro');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
-  // Local Editing State (fixes the generic editor issue for tabs)
+  // Local Editing State
   const [localIsEditing, setLocalIsEditing] = useState(false);
   
-  // Effective Editing State (Merge prop and local)
+  // Force System Definitions View State
+  const [showSystemSettings, setShowSystemSettings] = useState(false);
+  
   const isEditing = propIsEditing || localIsEditing;
 
   // Sync activeSectionId to Tabs
@@ -111,19 +114,19 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
   useEffect(() => {
       setIsFilterOpen(false);
       setLocalIsEditing(false); // Reset local edit when tab changes
-  }, [activeTabId]);
+      setShowSystemSettings(false); // Reset settings view on nav change
+  }, [activeTabId, article.title]);
 
 
-  // --- 3. Specific Page Renders ---
-  // Note: For full pages (not tabs), we might still rely on propIsEditing if passed from App, 
-  // but if navigated via sidebar, App handles it. 
-  // We can add local toggle for these too if needed, but App.tsx handles full page edits logic differently.
+  // --- Specific Page Renders ---
   
+  // 1. Priority Views (Override everything)
   if (article.title === 'صفحه اصلی') return <div className="bg-transparent"><HomeDashboard onNavigate={onNavigate || (() => {})} /></div>;
   if (article.title === 'تکامل') return <EvolutionTimeline />;
   if (article.title === 'چارت سازمانی') return <OrgChartView />;
+  if (article.title === 'تنظیمات پایه' || article.title === 'مدیریت سیستم' || showSystemSettings) return <SystemDefinitionsView />;
   
-  // For standalone specific pages, we use the prop based editing mainly, but can fallback to local if needed
+  // 2. Standalone Data Views
   if (article.title === 'عملکرد' || article.title === 'تحلیل عملکرد') return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
       <FinancialAnalysisView isEditing={isEditing} />
@@ -170,23 +173,25 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
     </div>
   );
 
+  // HR Root Page (Universal Access)
   if (article.title === 'سرمایه انسانی') return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm relative">
-       {isEditing && (
-         <div className="absolute top-4 left-4 z-20">
-             <button onClick={() => propIsEditing ? onEdit() : setLocalIsEditing(false)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
-                <Check size={16} /> <span>خروج از ویرایش</span>
-             </button>
-         </div>
-       )}
-       {!isEditing && (
-         <div className="absolute top-4 left-4 z-20">
-             <button onClick={() => setLocalIsEditing(true)} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 p-2 rounded-lg">
-                <Edit2 size={16} />
-             </button>
-         </div>
-       )}
-       <HumanCapitalView isEditing={isEditing} />
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm relative min-h-[600px]">
+       
+       {/* System Settings Button Injection */}
+       <div className="absolute top-6 left-6 z-20">
+           <button 
+             onClick={() => setShowSystemSettings(true)}
+             className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-600 dark:text-slate-300 hover:text-primary-700 dark:hover:text-primary-400 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold transition-colors"
+           >
+               <Settings size={14} />
+               <span>تنظیمات سیستم (Admin)</span>
+           </button>
+       </div>
+
+       <UniversalStaffList 
+         department="سرمایه انسانی"
+         isEditable={true} 
+       />
     </div>
   );
 
@@ -210,12 +215,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
                        title="ویرایش محتوا"
                     >
                        <Edit2 size={18} />
-                    </button>
-                    <button 
-                       className="p-2.5 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 bg-slate-50 dark:bg-slate-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors"
-                       title="نشان کردن"
-                    >
-                       <Bookmark size={18} />
                     </button>
                  </div>
               </div>
@@ -270,12 +269,16 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
     
       tabs = allTabs.filter(tab => {
           if (tab.id === 'intro') return true; 
-          return !!departmentTabs[tab.id as keyof typeof departmentTabs];
+          // Always show specialized tabs if we are in a department mode, even if empty, to allow adding data
+          return true; 
       });
-      showFilterButton = ['hr', 'resources', 'performance', 'timeline'].includes(activeTabId);
+      showFilterButton = ['resources', 'performance', 'timeline'].includes(activeTabId);
   }
 
   const activeTabLabel = tabs.find(t => t.id === activeTabId)?.label || tabs[0]?.label || 'نمایش';
+
+  // Helper to check if current tab supports Local Editing (Data Entry Mode)
+  const supportsLocalEditing = ['hr', 'resources', 'timeline'].includes(activeTabId);
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 min-h-[80vh] flex flex-col transition-all duration-300 relative">
@@ -323,6 +326,17 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
 
             {/* Mobile Actions Row */}
             <div className="flex gap-2">
+                {/* System Settings - Mobile */}
+                {activeTabId === 'hr' && (
+                    <button 
+                        onClick={() => setShowSystemSettings(true)}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm border border-slate-200 dark:border-slate-700"
+                    >
+                        <Settings size={18} />
+                        <span>تنظیمات</span>
+                    </button>
+                )}
+
                 {showFilterButton && (
                 <button 
                     onClick={() => setIsFilterOpen(true)}
@@ -334,7 +348,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
                 )}
                 
                 {/* Edit Button in Mobile Tab View - Use Local State */}
-                {['hr', 'resources', 'timeline'].includes(activeTabId) && (
+                {supportsLocalEditing && (
                     <button 
                         onClick={() => setLocalIsEditing(!localIsEditing)}
                         className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 border rounded-xl font-bold text-sm shadow-sm transition-colors 
@@ -343,7 +357,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-primary-50 dark:hover:bg-primary-900/20'}`}
                     >
                          {localIsEditing ? <Check size={18}/> : <Edit2 size={18} />}
-                         <span>{localIsEditing ? 'ذخیره' : 'مدیریت داده‌ها'}</span>
+                         <span>{localIsEditing ? 'پایان ویرایش' : 'مدیریت داده‌ها'}</span>
                     </button>
                 )}
             </div>
@@ -369,8 +383,20 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
               </div>
               
               <div className="flex items-center gap-3">
+                   {/* System Settings Button (Desktop) */}
+                   {activeTabId === 'hr' && (
+                       <button 
+                         onClick={() => setShowSystemSettings(true)}
+                         className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-primary-600 hover:bg-slate-50 dark:hover:bg-slate-800"
+                         title="مدیریت دپارتمان‌ها و عناوین شغلی"
+                       >
+                           <Settings size={16} />
+                           <span>تنظیمات سیستم</span>
+                       </button>
+                   )}
+
                    {/* Edit Button Desktop - Use Local State */}
-                   {['hr', 'resources', 'timeline'].includes(activeTabId) && (
+                   {supportsLocalEditing && (
                        <button 
                          onClick={() => setLocalIsEditing(!localIsEditing)}
                          className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all border 
@@ -421,54 +447,71 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: p
                         {/* Sub-Article Content */}
                         {(isOriginsMode || isPositionMode) ? (
                             (isOriginsMode ? originsTabs[activeTabId as keyof typeof originsTabs] : positionTabs[activeTabId as keyof typeof positionTabs]) ? (
-                                <div dangerouslySetInnerHTML={{ __html: (isOriginsMode ? originsTabs[activeTabId as keyof typeof originsTabs]! : positionTabs[activeTabId as keyof typeof positionTabs]!).contentHtml }} />
+                                <div dangerouslySetInnerHTML={{ __html: (isOriginsMode ? originsTabs[activeTabId as keyof typeof originsTabs] : positionTabs[activeTabId as keyof typeof positionTabs])?.contentHtml || '' }} />
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-12 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                                    <Package size={48} strokeWidth={1} className="mb-4 opacity-50" />
-                                    <p>محتوایی برای این بخش ثبت نشده است.</p>
-                                </div>
+                                <div className="text-center text-slate-400 py-10">محتوایی ثبت نشده است.</div>
                             )
-                        ) : (
-                            activeTabId === 'intro' && departmentTabs.intro && (
-                                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
-                                    <div dangerouslySetInnerHTML={{ __html: departmentTabs.intro.contentHtml }} />
-                                </div>
-                            )
-                        )}
+                        ) : null}
 
-                        {/* Empty State */}
-                        {activeTabId === 'intro' && !isOriginsMode && !isPositionMode && (!article.contentHtml || article.contentHtml.trim() === '') && !departmentTabs.intro && (
-                             <div className="flex flex-col items-center justify-center py-12 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-                                <Package size={48} strokeWidth={1} className="mb-4 opacity-50" />
-                                <p>محتوایی ثبت نشده است.</p>
-                             </div>
-                        )}
-
+                         {/* Edit Button for Sub-Articles */}
+                         {(isOriginsMode || isPositionMode) && (
+                            <div className="mt-4 flex justify-end">
+                                <button 
+                                  onClick={() => onEditSubArticle && onEditSubArticle((isOriginsMode ? originsTabs[activeTabId as keyof typeof originsTabs] : positionTabs[activeTabId as keyof typeof positionTabs])?.title || '')} 
+                                  className="flex items-center gap-2 text-sm text-primary-600 hover:underline"
+                                >
+                                    <Edit2 size={14} />
+                                    ویرایش این بخش
+                                </button>
+                            </div>
+                         )}
                      </div>
                 </div>
             )}
 
+            {/* HR / Staff List - Uses the Universal Component */}
             {activeTabId === 'hr' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <HumanCapitalView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} departmentName={article.title} isEditing={isEditing} />
+                    <UniversalStaffList 
+                        department={article.title}
+                        isEditable={isEditing}
+                    />
                 </div>
             )}
 
+            {/* Physical Resources */}
             {activeTabId === 'resources' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <PhysicalResourcesView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} isEditing={isEditing} />
+                    <PhysicalResourcesView 
+                        embedded={true} 
+                        isFilterOpen={isFilterOpen} 
+                        onFilterClose={() => setIsFilterOpen(false)}
+                        isEditing={isEditing}
+                    />
                 </div>
             )}
 
+            {/* Performance Analysis */}
             {activeTabId === 'performance' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <FinancialAnalysisView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} isEditing={isEditing} />
+                    <FinancialAnalysisView 
+                        embedded={true}
+                        isFilterOpen={isFilterOpen} 
+                        onFilterClose={() => setIsFilterOpen(false)}
+                        isEditing={isEditing}
+                    />
                 </div>
             )}
 
+            {/* Timeline */}
             {activeTabId === 'timeline' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <TimelineView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} isEditing={isEditing} />
+                     <TimelineView 
+                        embedded={true}
+                        isFilterOpen={isFilterOpen} 
+                        onFilterClose={() => setIsFilterOpen(false)}
+                        isEditing={isEditing}
+                     />
                 </div>
             )}
        </div>
