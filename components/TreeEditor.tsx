@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { NavNode } from '../types';
-import { Trash2, Plus, Save, X, Edit2, FileSpreadsheet, LayoutList } from 'lucide-react';
+import { Trash2, Plus, Save, X, Edit2, FileSpreadsheet, LayoutList, Check } from 'lucide-react';
+import ImageUploader from './ImageUploader';
 
 interface TreeEditorProps {
   initialData: NavNode[];
@@ -13,6 +14,7 @@ const TreeEditor: React.FC<TreeEditorProps> = ({ initialData, onSave, onClose })
   const [data, setData] = useState<NavNode[]>(initialData);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [editImage, setEditImage] = useState<string | undefined>(undefined);
   
   const [isImportMode, setIsImportMode] = useState(false);
   const [importText, setImportText] = useState('');
@@ -47,16 +49,25 @@ const TreeEditor: React.FC<TreeEditorProps> = ({ initialData, onSave, onClose })
     });
   };
 
-  const handleRename = (id: string, currentLabel: string) => {
-    setEditingId(id);
-    setEditValue(currentLabel);
+  const handleRename = (node: NavNode) => {
+    setEditingId(node.id);
+    setEditValue(node.label);
+    setEditImage(node.imageUrl);
   };
 
   const saveRename = () => {
     if (editingId) {
-      setData(prev => updateNode(prev, editingId, n => ({ ...n, label: editValue })));
+      setData(prev => updateNode(prev, editingId, n => ({ ...n, label: editValue, imageUrl: editImage })));
       setEditingId(null);
+      setEditValue('');
+      setEditImage(undefined);
     }
+  };
+
+  const cancelRename = () => {
+      setEditingId(null);
+      setEditValue('');
+      setEditImage(undefined);
   };
 
   const handleDelete = (id: string) => {
@@ -162,27 +173,51 @@ const TreeEditor: React.FC<TreeEditorProps> = ({ initialData, onSave, onClose })
     return (
       <div key={node.id} className="mb-2">
         <div 
-          className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-700"
+          className={`
+            flex items-start gap-2 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded transition-colors
+            ${isEditing ? 'ring-2 ring-primary-200 border-primary-400 dark:ring-primary-900' : 'hover:bg-slate-50 dark:hover:bg-slate-700'}
+          `}
           style={{ marginRight: `${level * 20}px` }}
         >
           {isEditing ? (
-            <div className="flex items-center gap-2 flex-1">
-              <input 
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                className="flex-1 border border-primary-300 rounded px-2 py-1 text-sm outline-none focus:ring-2 ring-primary-200 dark:bg-slate-700 dark:text-white"
-                autoFocus
-              />
-              <button onClick={saveRename} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 p-1 rounded"><Save size={16} /></button>
-              <button onClick={() => setEditingId(null)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 p-1 rounded"><X size={16} /></button>
+            <div className="flex flex-col gap-3 w-full p-1">
+               <div className="flex items-center gap-2 w-full">
+                  <input 
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    className="flex-1 border border-primary-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500 ring-offset-0 dark:bg-slate-700 dark:text-white"
+                    autoFocus
+                    placeholder="عنوان را وارد کنید..."
+                  />
+                  <button onClick={saveRename} className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-lg transition-colors" title="ذخیره"><Check size={16} /></button>
+                  <button onClick={cancelRename} className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg transition-colors" title="لغو"><X size={16} /></button>
+               </div>
+               
+               <div className="w-full bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                   <p className="text-xs font-bold text-slate-500 mb-2">تصویر شاخص (آیکون):</p>
+                   <div className="max-w-[200px]">
+                       <ImageUploader 
+                          folder="icons"
+                          currentImage={editImage}
+                          onUpload={(url) => setEditImage(url)}
+                          onRemove={() => setEditImage(undefined)}
+                       />
+                   </div>
+               </div>
             </div>
           ) : (
             <>
-              <span className="flex-1 text-sm text-slate-700 dark:text-slate-300 font-medium truncate">{node.label}</span>
+              <div className="flex items-center gap-2 flex-1 min-w-0 py-1">
+                  {node.imageUrl && (
+                      <img src={node.imageUrl} alt="" className="w-6 h-6 rounded object-cover border border-slate-200 dark:border-slate-600" />
+                  )}
+                  <span className="text-sm text-slate-700 dark:text-slate-300 font-medium truncate">{node.label}</span>
+              </div>
+              
               <div className="flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
-                <button onClick={() => handleRename(node.id, node.label)} className="p-1 hover:bg-primary-100 dark:hover:bg-primary-900 text-primary-600 dark:text-primary-400 rounded" title="تغییر نام"><Edit2 size={14} /></button>
-                <button onClick={() => handleAddChild(node.id)} className="p-1 hover:bg-green-100 dark:hover:bg-green-900 text-green-600 dark:text-green-400 rounded" title="افزودن زیرمجموعه"><Plus size={14} /></button>
-                <button onClick={() => handleDelete(node.id)} className="p-1 hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 rounded" title="حذف"><Trash2 size={14} /></button>
+                <button onClick={() => handleRename(node)} className="p-1.5 hover:bg-primary-100 dark:hover:bg-primary-900 text-primary-600 dark:text-primary-400 rounded-lg transition-colors" title="ویرایش"><Edit2 size={14} /></button>
+                <button onClick={() => handleAddChild(node.id)} className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900 text-green-600 dark:text-green-400 rounded-lg transition-colors" title="افزودن زیرمجموعه"><Plus size={14} /></button>
+                <button onClick={() => handleDelete(node.id)} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 rounded-lg transition-colors" title="حذف"><Trash2 size={14} /></button>
               </div>
             </>
           )}
@@ -209,7 +244,7 @@ const TreeEditor: React.FC<TreeEditorProps> = ({ initialData, onSave, onClose })
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"><X size={20} /></button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 relative">
+        <div className="flex-1 overflow-y-auto p-4 relative custom-scrollbar">
           {isImportMode ? (
             <div className="h-full flex flex-col">
               <div className="mb-2 p-3 bg-primary-50 dark:bg-primary-900/20 text-primary-800 dark:text-primary-200 text-xs rounded border border-primary-200 dark:border-primary-800 leading-relaxed">

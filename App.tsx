@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { WikiArticle, ViewMode, INITIAL_TREE_DATA, NavNode } from './types';
@@ -171,6 +170,10 @@ const App: React.FC = () => {
     setViewMode(ViewMode.EDIT);
   };
 
+  // Identify pages that should have a custom Data Editor instead of Text Editor
+  const specialDataPages = ['سرمایه انسانی', 'منابع فیزیکی', 'تقویم', 'گاه‌شمار فعالیت‌ها'];
+  const isSpecialDataPage = specialDataPages.includes(currentTopic) || specialDataPages.includes(currentArticle.title);
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 font-[Vazirmatn] transition-colors duration-300">
       
@@ -181,7 +184,7 @@ const App: React.FC = () => {
           {/* Logo */}
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => handleTopicSelect("صفحه اصلی")}>
             <img 
-              src="/logo.png" 
+              src="logo.png" 
               alt="لوگو" 
               className="w-10 h-10 rounded-full object-contain shadow-lg shadow-primary-500/20 group-hover:scale-105 transition-transform duration-300" 
             />
@@ -222,6 +225,7 @@ const App: React.FC = () => {
           onTogglePin={() => setIsSidebarPinned(!isSidebarPinned)}
           isMobileMenuOpen={isMobileMenuOpen}
           onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          onEditTree={() => setIsTreeEditorOpen(true)}
         />
 
         {/* Main Content Column */}
@@ -238,20 +242,21 @@ const App: React.FC = () => {
             <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar scroll-smooth">
                <div className="max-w-[1920px] mx-auto min-h-full flex flex-col">
                   <div className="max-w-7xl mx-auto w-full flex-1">
-                      {viewMode === ViewMode.READ ? (
-                          <ArticleView 
-                            article={currentArticle} 
-                            onEdit={() => setViewMode(ViewMode.EDIT)} 
-                            subArticles={subArticlesData}
-                            onEditSubArticle={handleEditSubArticle}
-                            activeSectionId={activeAccordionId}
-                            onNavigate={handleTopicSelect}
-                          />
-                      ) : (
+                      {viewMode === ViewMode.EDIT && !isSpecialDataPage ? (
                           <Editor 
                             article={currentArticle} 
                             onSave={handleSaveEdit} 
                             onCancel={() => setViewMode(ViewMode.READ)} 
+                          />
+                      ) : (
+                          <ArticleView 
+                            article={currentArticle} 
+                            onEdit={() => setViewMode(ViewMode.EDIT)} 
+                            isEditing={viewMode === ViewMode.EDIT && isSpecialDataPage}
+                            subArticles={subArticlesData}
+                            onEditSubArticle={handleEditSubArticle}
+                            activeSectionId={activeAccordionId}
+                            onNavigate={handleTopicSelect}
                           />
                       )}
                   </div>

@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { WikiArticle } from '../types';
-import { Bookmark, ChevronDown, ChevronUp, Info, Users, Package, Activity, Calendar, FileText, Filter, Scale, ShieldCheck, ClipboardList, History, Map, Target } from 'lucide-react';
+import { Bookmark, ChevronDown, ChevronUp, Info, Users, Package, Activity, Calendar, FileText, Filter, Scale, ShieldCheck, ClipboardList, History, Map, Target, Edit2, Check } from 'lucide-react';
 import HumanCapitalView from './HumanCapitalView';
 import FinancialAnalysisView from './FinancialAnalysisView';
 import TimelineView from './TimelineView';
@@ -21,23 +20,24 @@ interface SubArticleData {
 interface ArticleViewProps {
   article: WikiArticle;
   onEdit: () => void;
+  isEditing?: boolean;
   subArticles?: SubArticleData[];
   onEditSubArticle?: (title: string) => void;
   activeSectionId?: string | null;
   onNavigate?: (topic: string) => void;
 }
 
-const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles, onEditSubArticle, activeSectionId, onNavigate }) => {
+const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, isEditing: propIsEditing = false, subArticles, onEditSubArticle, activeSectionId, onNavigate }) => {
   
-  // --- 1. Tab Mapping Logic (Same as before) ---
+  // --- 1. Tab Mapping Logic ---
   const departmentTabs = useMemo(() => {
     const safeSubArticles = subArticles || [];
     return {
       intro: safeSubArticles.find(s => s.title.includes('معرفی') || s.title.includes('وظایف')),
       hr: safeSubArticles.find(s => s.title.includes('سرمایه انسانی') || s.title.includes('پرسنل') || s.title.includes('اعضا')),
       resources: safeSubArticles.find(s => s.title.includes('منابع') || s.title.includes('تجهیزات')),
-      performance: safeSubArticles.find(s => s.title.includes('عملکرد') || s.title.includes('تحلیل عملکرد')), // Supports both old and new names for safety
-      timeline: safeSubArticles.find(s => s.title.includes('تقویم') || s.title.includes('گاه‌شمار')) // Supports both old and new names
+      performance: safeSubArticles.find(s => s.title.includes('عملکرد') || s.title.includes('تحلیل عملکرد')),
+      timeline: safeSubArticles.find(s => s.title.includes('تقویم') || s.title.includes('گاه‌شمار'))
     };
   }, [subArticles]);
 
@@ -76,6 +76,12 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
   const [activeTabId, setActiveTabId] = useState<string>('intro');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Local Editing State (fixes the generic editor issue for tabs)
+  const [localIsEditing, setLocalIsEditing] = useState(false);
+  
+  // Effective Editing State (Merge prop and local)
+  const isEditing = propIsEditing || localIsEditing;
 
   // Sync activeSectionId to Tabs
   useEffect(() => {
@@ -104,17 +110,86 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
   
   useEffect(() => {
       setIsFilterOpen(false);
+      setLocalIsEditing(false); // Reset local edit when tab changes
   }, [activeTabId]);
 
 
   // --- 3. Specific Page Renders ---
+  // Note: For full pages (not tabs), we might still rely on propIsEditing if passed from App, 
+  // but if navigated via sidebar, App handles it. 
+  // We can add local toggle for these too if needed, but App.tsx handles full page edits logic differently.
+  
   if (article.title === 'صفحه اصلی') return <div className="bg-transparent"><HomeDashboard onNavigate={onNavigate || (() => {})} /></div>;
   if (article.title === 'تکامل') return <EvolutionTimeline />;
   if (article.title === 'چارت سازمانی') return <OrgChartView />;
-  if (article.title === 'عملکرد' || article.title === 'تحلیل عملکرد') return <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm"><FinancialAnalysisView /></div>;
-  if (article.title === 'تقویم' || article.title === 'گاه‌شمار فعالیت‌ها') return <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm"><TimelineView /></div>;
-  if (article.title === 'منابع فیزیکی') return <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm"><PhysicalResourcesView /></div>;
-  if (article.title === 'سرمایه انسانی') return <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm"><HumanCapitalView /></div>;
+  
+  // For standalone specific pages, we use the prop based editing mainly, but can fallback to local if needed
+  if (article.title === 'عملکرد' || article.title === 'تحلیل عملکرد') return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+      <FinancialAnalysisView isEditing={isEditing} />
+    </div>
+  );
+
+  if (article.title === 'تقویم' || article.title === 'گاه‌شمار فعالیت‌ها') return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm relative">
+       {isEditing && (
+         <div className="absolute top-4 left-4 z-20">
+             <button onClick={() => propIsEditing ? onEdit() : setLocalIsEditing(false)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                <Check size={16} /> <span>خروج از ویرایش</span>
+             </button>
+         </div>
+       )}
+       {!isEditing && (
+         <div className="absolute top-4 left-4 z-20">
+             <button onClick={() => setLocalIsEditing(true)} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 p-2 rounded-lg">
+                <Edit2 size={16} />
+             </button>
+         </div>
+       )}
+       <TimelineView isEditing={isEditing} />
+    </div>
+  );
+
+  if (article.title === 'منابع فیزیکی') return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm relative">
+       {isEditing && (
+         <div className="absolute top-4 left-4 z-20">
+             <button onClick={() => propIsEditing ? onEdit() : setLocalIsEditing(false)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                <Check size={16} /> <span>خروج از ویرایش</span>
+             </button>
+         </div>
+       )}
+       {!isEditing && (
+         <div className="absolute top-4 left-4 z-20">
+             <button onClick={() => setLocalIsEditing(true)} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 p-2 rounded-lg">
+                <Edit2 size={16} />
+             </button>
+         </div>
+       )}
+       <PhysicalResourcesView isEditing={isEditing} />
+    </div>
+  );
+
+  if (article.title === 'سرمایه انسانی') return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm relative">
+       {isEditing && (
+         <div className="absolute top-4 left-4 z-20">
+             <button onClick={() => propIsEditing ? onEdit() : setLocalIsEditing(false)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                <Check size={16} /> <span>خروج از ویرایش</span>
+             </button>
+         </div>
+       )}
+       {!isEditing && (
+         <div className="absolute top-4 left-4 z-20">
+             <button onClick={() => setLocalIsEditing(true)} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 p-2 rounded-lg">
+                <Edit2 size={16} />
+             </button>
+         </div>
+       )}
+       <HumanCapitalView isEditing={isEditing} />
+    </div>
+  );
+
   if (article.title === 'گزارشات جامع مالی') return <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm"><MacroFinancialView /></div>;
 
 
@@ -129,6 +204,13 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
                     <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white leading-tight">{article.title}</h1>
                  </div>
                  <div className="flex items-center gap-2">
+                    <button 
+                       onClick={onEdit}
+                       className="p-2.5 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 bg-slate-50 dark:bg-slate-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors"
+                       title="ویرایش محتوا"
+                    >
+                       <Edit2 size={18} />
+                    </button>
                     <button 
                        className="p-2.5 text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 bg-slate-50 dark:bg-slate-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors"
                        title="نشان کردن"
@@ -198,11 +280,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 min-h-[80vh] flex flex-col transition-all duration-300 relative">
        
-       {/* 
-          🔥🔥🔥 اصلاح شد: 
-          - استفاده از top-0 به جای top-16 (چون اسکرول در کانتینر داخلی است)
-          - استفاده از z-40 برای اطمینان از بالاتر بودن لایه
-       */}
        <div className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 transition-all duration-300 rounded-t-2xl shadow-sm">
           
           {/* Mobile Tab Selector */}
@@ -245,8 +322,8 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
             </div>
 
             {/* Mobile Actions Row */}
-            {showFilterButton && (
             <div className="flex gap-2">
+                {showFilterButton && (
                 <button 
                     onClick={() => setIsFilterOpen(true)}
                     className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 hover:border-primary-300 dark:hover:border-primary-700 transition-colors shadow-sm"
@@ -254,8 +331,22 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
                     <Filter size={20} />
                     <span className="text-sm font-bold">فیلترها</span>
                 </button>
+                )}
+                
+                {/* Edit Button in Mobile Tab View - Use Local State */}
+                {['hr', 'resources', 'timeline'].includes(activeTabId) && (
+                    <button 
+                        onClick={() => setLocalIsEditing(!localIsEditing)}
+                        className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 border rounded-xl font-bold text-sm shadow-sm transition-colors 
+                        ${localIsEditing 
+                            ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-primary-50 dark:hover:bg-primary-900/20'}`}
+                    >
+                         {localIsEditing ? <Check size={18}/> : <Edit2 size={18} />}
+                         <span>{localIsEditing ? 'ذخیره' : 'مدیریت داده‌ها'}</span>
+                    </button>
+                )}
             </div>
-            )}
           </div>
 
           {/* Desktop Tabs Navigation */}
@@ -278,6 +369,20 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
               </div>
               
               <div className="flex items-center gap-3">
+                   {/* Edit Button Desktop - Use Local State */}
+                   {['hr', 'resources', 'timeline'].includes(activeTabId) && (
+                       <button 
+                         onClick={() => setLocalIsEditing(!localIsEditing)}
+                         className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg transition-all border 
+                           ${localIsEditing 
+                             ? 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
+                             : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-primary-50 dark:hover:bg-primary-900/30 border-transparent hover:border-slate-300'}`}
+                       >
+                           {localIsEditing ? <Check size={14}/> : <Edit2 size={14} />}
+                           <span>{localIsEditing ? 'پایان ویرایش' : 'مدیریت داده‌ها'}</span>
+                       </button>
+                   )}
+
                    {showFilterButton && (
                       <button 
                         onClick={() => setIsFilterOpen(true)}
@@ -301,6 +406,16 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
                         {/* Main Article Content */}
                         {activeTabId === 'intro' && article.contentHtml && article.contentHtml.trim() !== '' && (
                             <div dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
+                        )}
+                        
+                        {/* Edit Button for Intro - Calls global editor via prop */}
+                        {activeTabId === 'intro' && (
+                             <div className="mt-4 flex justify-end">
+                                 <button onClick={onEdit} className="flex items-center gap-2 text-sm text-primary-600 hover:underline">
+                                     <Edit2 size={14} />
+                                     ویرایش متن
+                                 </button>
+                             </div>
                         )}
 
                         {/* Sub-Article Content */}
@@ -335,25 +450,25 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onEdit, subArticles,
 
             {activeTabId === 'hr' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <HumanCapitalView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} departmentName={article.title} />
+                    <HumanCapitalView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} departmentName={article.title} isEditing={isEditing} />
                 </div>
             )}
 
             {activeTabId === 'resources' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <PhysicalResourcesView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} />
+                    <PhysicalResourcesView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} isEditing={isEditing} />
                 </div>
             )}
 
             {activeTabId === 'performance' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <FinancialAnalysisView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} />
+                    <FinancialAnalysisView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} isEditing={isEditing} />
                 </div>
             )}
 
             {activeTabId === 'timeline' && (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <TimelineView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} />
+                    <TimelineView embedded={true} isFilterOpen={isFilterOpen} onFilterClose={() => setIsFilterOpen(false)} isEditing={isEditing} />
                 </div>
             )}
        </div>

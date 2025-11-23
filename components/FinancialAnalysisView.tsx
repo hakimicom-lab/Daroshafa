@@ -586,9 +586,10 @@ interface FinancialAnalysisViewProps {
     embedded?: boolean;
     isFilterOpen?: boolean;
     onFilterClose?: () => void;
+    isEditing?: boolean;
 }
 
-const FinancialAnalysisView: React.FC<FinancialAnalysisViewProps> = ({ embedded = false, isFilterOpen, onFilterClose }) => {
+const FinancialAnalysisView: React.FC<FinancialAnalysisViewProps> = ({ embedded = false, isFilterOpen, onFilterClose, isEditing = false }) => {
   const [activeTab, setActiveTab] = useState<'quantity' | 'revenue'>('quantity');
   const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null);
   

@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Package, ChevronDown, ChevronUp, Check, Image as ImageIcon, Info, FileText, X, Download, Filter, AlertCircle, ShoppingCart, Archive } from 'lucide-react';
+import { Package, ChevronDown, ChevronUp, Check, Image as ImageIcon, Info, FileText, X, Download, Filter, AlertCircle, ShoppingCart, Archive, Plus, Edit2, Trash2, Save } from 'lucide-react';
+import ImageUploader from './ImageUploader';
 
 // --- Types ---
 interface EquipmentItem {
@@ -10,7 +11,7 @@ interface EquipmentItem {
   category: string;
   year: string;
   description: string;
-  status: 'active' | 'retired' | 'planned'; // New Status Field
+  status: 'active' | 'retired' | 'planned'; 
   images: string[];
   docs: string[];
 }
@@ -124,6 +125,7 @@ interface PhysicalResourcesViewProps {
   embedded?: boolean;
   isFilterOpen?: boolean;
   onFilterClose?: () => void;
+  isEditing?: boolean;
 }
 
 // Internal MultiSelect Dropdown
@@ -235,8 +237,11 @@ const ExpandableResourceCard: React.FC<{
     item: EquipmentItem, 
     isExpanded: boolean, 
     onToggle: () => void,
-    onShowImages: (imgs: string[]) => void 
-}> = ({ item, isExpanded, onToggle, onShowImages }) => {
+    onShowImages: (imgs: string[]) => void,
+    isEditing: boolean,
+    onEdit: (item: EquipmentItem) => void,
+    onDelete: (id: string) => void
+}> = ({ item, isExpanded, onToggle, onShowImages, isEditing, onEdit, onDelete }) => {
     
     const getStatusBadge = () => {
         switch(item.status) {
@@ -263,11 +268,28 @@ const ExpandableResourceCard: React.FC<{
 
     return (
         <div className={`
-            border rounded-xl shadow-sm transition-all overflow-hidden
+            border rounded-xl shadow-sm transition-all overflow-hidden relative
             ${isExpanded 
                ? 'bg-primary-50 dark:bg-slate-800 border-primary-500 dark:border-primary-400 shadow-md ring-1 ring-primary-500/20 dark:ring-primary-400/20' 
                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-800 hover:shadow-md'}
         `}>
+            {isEditing && (
+                <div className="absolute top-2 left-2 flex gap-2 z-20">
+                    <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                    className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full transition-colors"
+                    >
+                        <Edit2 size={14} />
+                    </button>
+                    <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                    className="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            )}
+
             <div className="p-5 flex items-center justify-between cursor-pointer select-none" onClick={onToggle}>
                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 overflow-hidden">
                      <div className="flex items-center gap-2">
@@ -332,13 +354,35 @@ const ExpandableResourceCard: React.FC<{
     );
 };
 
-const PhysicalResourcesView: React.FC<PhysicalResourcesViewProps> = ({ embedded = false, isFilterOpen, onFilterClose }) => {
+const PhysicalResourcesView: React.FC<PhysicalResourcesViewProps> = ({ embedded = false, isFilterOpen, onFilterClose, isEditing = false }) => {
+  const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
+
+  // Load Data
+  useEffect(() => {
+    const saved = localStorage.getItem('equipment_data');
+    if (saved) {
+        setEquipment(JSON.parse(saved));
+    } else {
+        setEquipment(EQUIPMENTS);
+    }
+  }, []);
+
+  // Save Data
+  useEffect(() => {
+    localStorage.setItem('equipment_data', JSON.stringify(equipment));
+  }, [equipment]);
+
+
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [activeImage, setActiveImage] = useState<string[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  
   const [internalFilterOpen, setInternalFilterOpen] = useState(false);
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<EquipmentItem | null>(null);
+  const [formData, setFormData] = useState<Partial<EquipmentItem>>({});
 
   // Derive visibility control from props if embedded, otherwise use local state
   const isFilterVisible = embedded ? !!isFilterOpen : internalFilterOpen;
@@ -350,7 +394,7 @@ const PhysicalResourcesView: React.FC<PhysicalResourcesViewProps> = ({ embedded 
     { label: 'برنامه خرید', value: 'planned' },
   ];
 
-  const filteredData = EQUIPMENTS.filter(item => {
+  const filteredData = equipment.filter(item => {
      const catMatch = selectedCategories.length === 0 || selectedCategories.includes(item.category);
      const statusMatch = selectedStatuses.length === 0 || selectedStatuses.includes(item.status);
      return catMatch && statusMatch;
@@ -358,6 +402,54 @@ const PhysicalResourcesView: React.FC<PhysicalResourcesViewProps> = ({ embedded 
 
   const handleToggle = (id: string) => {
       setExpandedId(prev => prev === id ? null : id);
+  };
+
+  // CRUD
+  const handleAddClick = () => {
+    setEditingItem(null);
+    setFormData({
+        nameFa: '', nameEn: '', category: '', year: '', description: '', status: 'active', images: []
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleEditClick = (item: EquipmentItem) => {
+      setEditingItem(item);
+      setFormData({ ...item });
+      setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (id: string) => {
+      if(window.confirm('آیا از حذف این مورد اطمینان دارید؟')) {
+          setEquipment(prev => prev.filter(i => i.id !== id));
+      }
+  };
+
+  const handleSaveForm = () => {
+      if (!formData.nameFa) return alert('نام تجهیزات الزامی است');
+      
+      if (editingItem) {
+          setEquipment(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...formData } as EquipmentItem : i));
+      } else {
+          const newId = `eq-${Date.now()}`;
+          const newItem = { ...formData, id: newId, docs: [] } as EquipmentItem;
+          setEquipment(prev => [newItem, ...prev]);
+      }
+      setIsModalOpen(false);
+  };
+
+  const handleImageUpload = (url: string) => {
+      setFormData(prev => ({
+          ...prev,
+          images: [...(prev.images || []), url]
+      }));
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setFormData(prev => ({
+        ...prev,
+        images: prev.images?.filter((_, i) => i !== index)
+    }));
   };
 
   return (
@@ -374,15 +466,27 @@ const PhysicalResourcesView: React.FC<PhysicalResourcesViewProps> = ({ embedded 
                 {filteredData.length} مورد یافت شد
              </div>
              
-             {!embedded && (
-                <button 
-                onClick={() => setInternalFilterOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-xl border border-primary-100 dark:border-primary-800 font-bold text-sm transition-all whitespace-nowrap"
-                >
-                <Filter size={18} />
-                <span>فیلترها</span>
-                </button>
-             )}
+             <div className="flex items-center gap-2">
+                 {isEditing && (
+                     <button 
+                         onClick={handleAddClick}
+                         className="flex items-center gap-2 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold text-sm transition-all shadow-sm"
+                     >
+                         <Plus size={18} />
+                         <span>افزودن تجهیز</span>
+                     </button>
+                 )}
+
+                 {!embedded && (
+                    <button 
+                    onClick={() => setInternalFilterOpen(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-xl border border-primary-100 dark:border-primary-800 font-bold text-sm transition-all whitespace-nowrap"
+                    >
+                    <Filter size={18} />
+                    <span>فیلترها</span>
+                    </button>
+                 )}
+             </div>
          </div>
        </div>
 
@@ -464,6 +568,9 @@ const PhysicalResourcesView: React.FC<PhysicalResourcesViewProps> = ({ embedded 
                           isExpanded={expandedId === item.id}
                           onToggle={() => handleToggle(item.id)}
                           onShowImages={setActiveImage}
+                          isEditing={isEditing}
+                          onEdit={handleEditClick}
+                          onDelete={handleDeleteClick}
                       />
                   ))}
               </div>
@@ -482,6 +589,106 @@ const PhysicalResourcesView: React.FC<PhysicalResourcesViewProps> = ({ embedded 
                 </div>
              </div>
           </div>
+       )}
+
+       {/* Modal: Add/Edit */}
+       {isModalOpen && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+               <div className="relative bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+                   <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                       <h3 className="font-bold text-lg">{editingItem ? 'ویرایش تجهیزات' : 'افزودن تجهیزات جدید'}</h3>
+                       <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+                   </div>
+                   
+                   <div className="p-6 overflow-y-auto space-y-4">
+                        {/* Images Upload */}
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">تصاویر</label>
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                {formData.images?.map((img, idx) => (
+                                    <div key={idx} className="relative w-20 h-20 shrink-0">
+                                        <img src={img} className="w-full h-full object-cover rounded-lg border border-slate-200" alt="" />
+                                        <button onClick={() => handleRemoveImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-full transform translate-x-1/2 -translate-y-1/2 shadow-sm"><X size={12}/></button>
+                                    </div>
+                                ))}
+                                <div className="w-20 shrink-0">
+                                    <ImageUploader 
+                                        folder="equipment"
+                                        onUpload={handleImageUpload}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">نام فارسی</label>
+                            <input 
+                              value={formData.nameFa || ''}
+                              onChange={e => setFormData(prev => ({ ...prev, nameFa: e.target.value }))}
+                              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">نام انگلیسی</label>
+                            <input 
+                              value={formData.nameEn || ''}
+                              onChange={e => setFormData(prev => ({ ...prev, nameEn: e.target.value }))}
+                              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all dir-ltr"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">دسته‌بندی</label>
+                                <input 
+                                value={formData.category || ''}
+                                onChange={e => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                                placeholder="مثال: لیزر درمانی"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">سال بهره‌برداری</label>
+                                <input 
+                                value={formData.year || ''}
+                                onChange={e => setFormData(prev => ({ ...prev, year: e.target.value }))}
+                                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-center"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">توضیحات</label>
+                            <textarea 
+                              value={formData.description || ''}
+                              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all min-h-[100px]"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">وضعیت</label>
+                            <div className="flex bg-slate-50 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700">
+                                {['active', 'retired', 'planned'].map((s) => (
+                                    <button
+                                        key={s}
+                                        onClick={() => setFormData(prev => ({ ...prev, status: s as any }))}
+                                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${formData.status === s ? 'bg-white dark:bg-slate-700 shadow text-primary-600 dark:text-primary-400' : 'text-slate-500 dark:text-slate-400'}`}
+                                    >
+                                        {s === 'active' ? 'فعال' : s === 'retired' ? 'خارج از رده' : 'برنامه خرید'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                   </div>
+
+                   <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-b-2xl flex gap-3">
+                       <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">انصراف</button>
+                       <button onClick={handleSaveForm} className="flex-[2] py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-primary-500/20 flex items-center justify-center gap-2">
+                           <Save size={18} />
+                           <span>ذخیره تغییرات</span>
+                       </button>
+                   </div>
+               </div>
+           </div>
        )}
 
     </div>

@@ -1,7 +1,7 @@
 
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { User, ChevronDown, ChevronUp, Check, Search, Filter, X } from 'lucide-react';
+import { User, ChevronDown, ChevronUp, Check, Search, Filter, X, Plus, Edit2, Trash2, Save, ShieldAlert, Calendar } from 'lucide-react';
+import ImageUploader from './ImageUploader';
 
 interface Colleague {
   id: number;
@@ -11,17 +11,18 @@ interface Colleague {
   endDate: string; // Empty if active
   isActive: boolean;
   imageUrl: string;
+  nationalId?: string; // New field, strictly private/admin only
 }
 
 const MOCK_DATA: Colleague[] = [
-  { id: 1, name: 'دکتر علی محمدی', specialty: 'متخصص چشم‌پزشکی', startDate: '۱۳۸۵/۰۵/۰۱', endDate: '', isActive: true, imageUrl: '' },
-  { id: 2, name: 'دکتر سارا احمدی', specialty: 'فوق تخصص شبکیه', startDate: '۱۳۹۰/۰۲/۱۵', endDate: '', isActive: true, imageUrl: '' },
-  { id: 3, name: 'دکتر رضا کریمی', specialty: 'متخصص چشم‌پزشکی', startDate: '۱۳۸۳/۰۱/۰۱', endDate: '۱۳۹۵/۱۲/۲۹', isActive: false, imageUrl: '' },
-  { id: 4, name: 'دکتر مریم حسینی', specialty: 'فوق تخصص قرنیه', startDate: '۱۳۸۸/۰۷/۱۰', endDate: '', isActive: true, imageUrl: '' },
-  { id: 5, name: 'دکتر حسن رضایی', specialty: 'مسئول فنی', startDate: '۱۳۸۴/۰۶/۲۰', endDate: '۱۳۹۸/۰۴/۱۵', isActive: false, imageUrl: '' },
-  { id: 6, name: 'دکتر زهرا نعمتی', specialty: 'مسئول فنی', startDate: '۱۳۹۵/۰۱/۲۰', endDate: '', isActive: true, imageUrl: '' },
-  { id: 7, name: 'دکتر کامران وفایی', specialty: 'متخصص چشم‌پزشکی', startDate: '۱۳۹۲/۰۸/۰۵', endDate: '۱۴۰۲/۱۰/۳۰', isActive: false, imageUrl: '' },
-  { id: 8, name: 'دکتر بیتا شمس', specialty: 'فوق تخصص شبکیه', startDate: '۱۳۸۶/۰۳/۱۲', endDate: '۱۴۰۰/۰۵/۰۵', isActive: false, imageUrl: '' },
+  { id: 1, name: 'دکتر علی محمدی', specialty: 'متخصص چشم‌پزشکی', startDate: '۱۳۸۵/۰۵/۰۱', endDate: '', isActive: true, imageUrl: '', nationalId: '1234567890' },
+  { id: 2, name: 'دکتر سارا احمدی', specialty: 'فوق تخصص شبکیه', startDate: '۱۳۹۰/۰۲/۱۵', endDate: '', isActive: true, imageUrl: '', nationalId: '0987654321' },
+  { id: 3, name: 'دکتر رضا کریمی', specialty: 'متخصص چشم‌پزشکی', startDate: '۱۳۸۳/۰۱/۰۱', endDate: '۱۳۹۵/۱۲/۲۹', isActive: false, imageUrl: '', nationalId: '1122334455' },
+  { id: 4, name: 'دکتر مریم حسینی', specialty: 'فوق تخصص قرنیه', startDate: '۱۳۸۸/۰۷/۱۰', endDate: '', isActive: true, imageUrl: '', nationalId: '5544332211' },
+  { id: 5, name: 'دکتر حسن رضایی', specialty: 'مسئول فنی', startDate: '۱۳۸۴/۰۶/۲۰', endDate: '۱۳۹۸/۰۴/۱۵', isActive: false, imageUrl: '', nationalId: '6677889900' },
+  { id: 6, name: 'دکتر زهرا نعمتی', specialty: 'مسئول فنی', startDate: '۱۳۹۵/۰۱/۲۰', endDate: '', isActive: true, imageUrl: '', nationalId: '9988776655' },
+  { id: 7, name: 'دکتر کامران وفایی', specialty: 'متخصص چشم‌پزشکی', startDate: '۱۳۹۲/۰۸/۰۵', endDate: '۱۴۰۲/۱۰/۳۰', isActive: false, imageUrl: '', nationalId: '1231231234' },
+  { id: 8, name: 'دکتر بیتا شمس', specialty: 'فوق تخصص شبکیه', startDate: '۱۳۸۶/۰۳/۱۲', endDate: '۱۴۰۰/۰۵/۰۵', isActive: false, imageUrl: '', nationalId: '3213214321' },
 ];
 
 const TRUSTEES_DATA: Colleague[] = [
@@ -47,6 +48,7 @@ interface HumanCapitalViewProps {
   isFilterOpen?: boolean;
   onFilterClose?: () => void;
   departmentName?: string;
+  isEditing?: boolean;
 }
 
 const MultiSelectDropdown: React.FC<{
@@ -153,14 +155,40 @@ const MultiSelectDropdown: React.FC<{
   );
 };
 
-const ExpandablePersonCard: React.FC<{ person: Colleague, isExpanded: boolean, onToggle: () => void }> = ({ person, isExpanded, onToggle }) => {
+const ExpandablePersonCard: React.FC<{ 
+  person: Colleague, 
+  isExpanded: boolean, 
+  onToggle: () => void,
+  isEditing: boolean,
+  onEdit: (p: Colleague) => void,
+  onDelete: (id: number) => void
+}> = ({ person, isExpanded, onToggle, isEditing, onEdit, onDelete }) => {
   return (
     <div className={`
-        border rounded-2xl shadow-sm transition-all overflow-hidden
+        border rounded-2xl shadow-sm transition-all overflow-hidden relative
         ${isExpanded 
            ? 'bg-primary-50 dark:bg-slate-800 border-primary-500 dark:border-primary-400 shadow-md ring-1 ring-primary-500/20 dark:ring-primary-400/20' 
            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-800 hover:shadow-md'}
     `}>
+        {isEditing && (
+            <div className="absolute top-2 left-2 flex gap-2 z-20">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onEdit(person); }}
+                  className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full transition-colors"
+                  title="ویرایش اطلاعات"
+                >
+                    <Edit2 size={14} />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onDelete(person.id); }}
+                  className="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"
+                  title="حذف فرد"
+                >
+                    <Trash2 size={14} />
+                </button>
+            </div>
+        )}
+
         <div className="p-4 flex items-center justify-between cursor-pointer select-none" onClick={onToggle}>
              <div className="flex items-center gap-5 overflow-hidden">
                  {person.imageUrl ? (
@@ -220,29 +248,58 @@ const ExpandablePersonCard: React.FC<{ person: Colleague, isExpanded: boolean, o
 };
 
 
-const HumanCapitalView: React.FC<HumanCapitalViewProps> = ({ embedded = false, isFilterOpen, onFilterClose, departmentName = '' }) => {
+const HumanCapitalView: React.FC<HumanCapitalViewProps> = ({ embedded = false, isFilterOpen, onFilterClose, departmentName = '', isEditing = false }) => {
   
-  // Determine Data Source
-  const dataSource = useMemo(() => {
+  // -- Data Management --
+  const storageKey = useMemo(() => {
+    if (departmentName.includes('هیات امناء')) return 'trustees_data';
+    if (departmentName.includes('هیات مدیره')) return 'directors_data';
+    return 'staff_data';
+  }, [departmentName]);
+
+  const defaultData = useMemo(() => {
       if (departmentName.includes('هیات امناء')) return TRUSTEES_DATA;
       if (departmentName.includes('هیات مدیره')) return DIRECTORS_DATA;
       return MOCK_DATA;
   }, [departmentName]);
 
+  const [people, setPeople] = useState<Colleague[]>([]);
+
+  // Load data
+  useEffect(() => {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+          setPeople(JSON.parse(saved));
+      } else {
+          setPeople(defaultData);
+      }
+  }, [storageKey, defaultData]);
+
+  // Save data
+  useEffect(() => {
+      localStorage.setItem(storageKey, JSON.stringify(people));
+  }, [people, storageKey]);
+
+
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  
   const [internalFilterOpen, setInternalFilterOpen] = useState(false);
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPerson, setEditingPerson] = useState<Colleague | null>(null);
 
-  // Derive visibility control from props if embedded, otherwise use local state
+  // Form State
+  const [formData, setFormData] = useState<Partial<Colleague>>({});
+
   const isFilterVisible = embedded ? !!isFilterOpen : internalFilterOpen;
   const closeFilter = embedded ? (onFilterClose || (() => {})) : () => setInternalFilterOpen(false);
 
   // Unique Specialties for filter
-  const specialties = Array.from(new Set(dataSource.map(d => d.specialty)));
+  const specialties = Array.from(new Set(people.map(d => d.specialty)));
 
-  const filteredData = dataSource.filter(item => {
+  const filteredData = people.filter(item => {
     const specialtyMatch = selectedSpecialties.length === 0 || selectedSpecialties.includes(item.specialty);
     const statusMatch = statusFilter === 'all' 
       ? true 
@@ -254,6 +311,42 @@ const HumanCapitalView: React.FC<HumanCapitalViewProps> = ({ embedded = false, i
   const handleToggle = (id: number) => {
       setExpandedId(prev => prev === id ? null : id);
   }
+
+  // --- CRUD Handlers ---
+  const handleAddClick = () => {
+      setEditingPerson(null);
+      setFormData({ 
+          name: '', specialty: '', startDate: '', endDate: '', isActive: true, imageUrl: '', nationalId: ''
+      });
+      setIsModalOpen(true);
+  };
+
+  const handleEditClick = (person: Colleague) => {
+      setEditingPerson(person);
+      setFormData({ ...person });
+      setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (id: number) => {
+      if(window.confirm('آیا از حذف این فرد اطمینان دارید؟')) {
+          setPeople(prev => prev.filter(p => p.id !== id));
+      }
+  };
+
+  const handleSaveForm = () => {
+      if (!formData.name) return alert('نام الزامی است');
+      
+      if (editingPerson) {
+          // Update
+          setPeople(prev => prev.map(p => p.id === editingPerson.id ? { ...p, ...formData } as Colleague : p));
+      } else {
+          // Add
+          const newId = Math.max(...people.map(p => p.id), 0) + 1;
+          const newPerson = { ...formData, id: newId } as Colleague;
+          setPeople(prev => [newPerson, ...prev]);
+      }
+      setIsModalOpen(false);
+  };
 
   return (
     <div className={`${embedded ? 'bg-transparent' : 'bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm'} min-h-[50vh]`}>
@@ -269,15 +362,27 @@ const HumanCapitalView: React.FC<HumanCapitalViewProps> = ({ embedded = false, i
               {filteredData.length} نفر یافت شد
            </div>
           
-          {!embedded && (
-            <button 
-                onClick={() => setInternalFilterOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-xl border border-primary-100 dark:border-primary-800 font-bold text-sm transition-all whitespace-nowrap"
-            >
-                <Filter size={18} />
-                <span>فیلترها</span>
-            </button>
-          )}
+           <div className="flex items-center gap-2 w-full sm:w-auto">
+               {isEditing && (
+                   <button 
+                       onClick={handleAddClick}
+                       className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm w-full sm:w-auto"
+                   >
+                       <Plus size={18} />
+                       <span>افزودن فرد جدید</span>
+                   </button>
+               )}
+
+                {!embedded && (
+                    <button 
+                        onClick={() => setInternalFilterOpen(true)}
+                        className="flex items-center gap-2 px-6 py-3 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-xl border border-primary-100 dark:border-primary-800 font-bold text-sm transition-all whitespace-nowrap"
+                    >
+                        <Filter size={18} />
+                        <span>فیلترها</span>
+                    </button>
+                )}
+           </div>
         </div>
       </div>
 
@@ -353,7 +458,7 @@ const HumanCapitalView: React.FC<HumanCapitalViewProps> = ({ embedded = false, i
         </div>
       )}
 
-      {/* List Content (Accordion Style) */}
+      {/* List Content */}
       <div className={`${embedded ? 'p-0' : 'p-6'}`}>
          {filteredData.length === 0 ? (
             <div className="text-center text-slate-400 py-10 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">موردی یافت نشد.</div>
@@ -365,11 +470,147 @@ const HumanCapitalView: React.FC<HumanCapitalViewProps> = ({ embedded = false, i
                       person={person} 
                       isExpanded={expandedId === person.id}
                       onToggle={() => handleToggle(person.id)}
+                      isEditing={isEditing}
+                      onEdit={handleEditClick}
+                      onDelete={handleDeleteClick}
                    />
                 ))}
             </div>
          )}
       </div>
+
+      {/* Add/Edit Modal (Structured Form) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+             <div className="relative bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+                 <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                     <h3 className="font-black text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                         {editingPerson ? <Edit2 size={20} className="text-blue-500"/> : <Plus size={20} className="text-green-500"/>}
+                         {editingPerson ? 'ویرایش پرونده پرسنلی' : 'ایجاد پرونده پرسنلی جدید'}
+                     </h3>
+                     <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-400 hover:text-red-500 transition-colors" /></button>
+                 </div>
+                 
+                 <div className="p-6 overflow-y-auto space-y-6">
+                      
+                      <div className="flex flex-col md:flex-row gap-6">
+                          {/* Image Section */}
+                          <div className="flex flex-col items-center gap-3 w-full md:w-1/3">
+                               <div className="w-32 h-32">
+                                  <ImageUploader 
+                                    folder="staff"
+                                    currentImage={formData.imageUrl}
+                                    onUpload={(url) => setFormData(prev => ({ ...prev, imageUrl: url }))}
+                                    onRemove={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
+                                  />
+                               </div>
+                               <span className="text-xs text-slate-400">تصویر پرسنلی (اختیاری)</span>
+                          </div>
+
+                          {/* Info Section */}
+                          <div className="flex-1 space-y-4 w-full">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">نام و نام خانوادگی <span className="text-red-500">*</span></label>
+                                    <input 
+                                        value={formData.name || ''}
+                                        onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                                        className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all font-bold"
+                                        placeholder="مثال: دکتر علی رضایی"
+                                    />
+                                </div>
+                                
+                                <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800 rounded-xl">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <ShieldAlert size={16} className="text-amber-600 dark:text-amber-400" />
+                                        <label className="text-xs font-bold text-amber-700 dark:text-amber-400">کد ملی (محرمانه - فقط مدیران)</label>
+                                    </div>
+                                    <input 
+                                        value={formData.nationalId || ''}
+                                        onChange={e => setFormData(prev => ({ ...prev, nationalId: e.target.value }))}
+                                        className="w-full p-2.5 rounded-lg border border-amber-200 dark:border-amber-900 bg-white dark:bg-slate-900/50 focus:ring-2 focus:ring-amber-500 outline-none transition-all font-mono text-center tracking-widest text-slate-700 dark:text-slate-200"
+                                        placeholder="----------"
+                                        maxLength={10}
+                                    />
+                                </div>
+                          </div>
+                      </div>
+
+                      <hr className="border-slate-100 dark:border-slate-800" />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">سمت / تخصص</label>
+                              <div className="relative">
+                                  <input 
+                                    value={formData.specialty || ''}
+                                    onChange={e => setFormData(prev => ({ ...prev, specialty: e.target.value }))}
+                                    className="w-full p-3 pl-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                                    placeholder="مثال: متخصص جراحی"
+                                  />
+                                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><Search size={16}/></div>
+                              </div>
+                          </div>
+
+                          <div>
+                              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">وضعیت همکاری</label>
+                              <div className="flex bg-slate-50 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700 h-[46px]">
+                                  <button
+                                      onClick={() => setFormData(prev => ({ ...prev, isActive: true }))}
+                                      className={`flex-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${formData.isActive ? 'bg-white dark:bg-slate-700 shadow text-green-600 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}`}
+                                  >
+                                      {formData.isActive && <Check size={14} />}
+                                      فعال
+                                  </button>
+                                  <button
+                                      onClick={() => setFormData(prev => ({ ...prev, isActive: false }))}
+                                      className={`flex-1 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${!formData.isActive ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'}`}
+                                  >
+                                      {!formData.isActive && <Check size={14} />}
+                                      سابق / قطع همکاری
+                                  </button>
+                              </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">تاریخ شروع</label>
+                            <div className="relative">
+                                <input 
+                                    value={formData.startDate || ''}
+                                    onChange={e => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                                    className="w-full p-3 pl-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-center font-mono"
+                                    placeholder="۱۴۰۰/۰۱/۰۱"
+                                />
+                                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className={`block text-xs font-bold mb-1.5 ${formData.isActive ? 'text-slate-300 dark:text-slate-600' : 'text-slate-700 dark:text-slate-300'}`}>تاریخ پایان</label>
+                            <div className="relative">
+                                <input 
+                                    value={formData.endDate || ''}
+                                    onChange={e => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                                    className="w-full p-3 pl-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-center font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+                                    placeholder="---"
+                                    disabled={formData.isActive}
+                                />
+                                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            </div>
+                          </div>
+                      </div>
+                 </div>
+
+                 <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-b-2xl flex gap-3">
+                     <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">انصراف</button>
+                     <button onClick={handleSaveForm} className="flex-[2] py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-primary-500/20 flex items-center justify-center gap-2">
+                         <Save size={18} />
+                         <span>{editingPerson ? 'ذخیره تغییرات' : 'ایجاد پرونده'}</span>
+                     </button>
+                 </div>
+             </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -15,6 +15,7 @@ export interface NavNode {
   isExpanded?: boolean;
   type?: 'group' | 'item' | 'separator';
   hideChildren?: boolean; // New property to hide children in navigation but keep them for logic
+  imageUrl?: string; // URL of the image associated with the node
 }
 
 export enum ViewMode {

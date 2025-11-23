@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { CheckCircle, Award, Eye, ArrowDown, Calendar, TrendingUp, Filter, ChevronDown, ChevronUp, Check, X, Image as ImageIcon, FileText, Download, Moon, Sun, Clock, Loader2, Map } from 'lucide-react';
+import { CheckCircle, Award, Eye, ArrowDown, Calendar, TrendingUp, Filter, ChevronDown, ChevronUp, Check, X, Image as ImageIcon, FileText, Download, Moon, Sun, Clock, Loader2, Map, Plus, Edit2, Trash2, Save } from 'lucide-react';
+import ImageUploader from './ImageUploader';
 
 interface TimelineItem {
   id: string;
@@ -299,8 +300,11 @@ const TimelineCard: React.FC<{
     isExpanded: boolean, 
     onToggle: () => void,
     onShowImages: (imgs: string[]) => void,
-    calendarType: 'shamsi' | 'lunar'
-}> = ({ item, isExpanded, onToggle, onShowImages, calendarType }) => {
+    calendarType: 'shamsi' | 'lunar',
+    isEditing: boolean,
+    onEdit: (item: TimelineItem) => void,
+    onDelete: (id: string) => void
+}> = ({ item, isExpanded, onToggle, onShowImages, calendarType, isEditing, onEdit, onDelete }) => {
     
     const getIcon = () => {
         switch(item.type) {
@@ -350,6 +354,23 @@ const TimelineCard: React.FC<{
                ? 'bg-primary-50 dark:bg-slate-800 border-primary-500 dark:border-primary-400 shadow-md ring-1 ring-primary-500/20 dark:ring-primary-400/20' 
                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-800 hover:shadow-md'}
         `}>
+             {isEditing && (
+                <div className="absolute top-2 left-2 flex gap-2 z-20">
+                    <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                    className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full transition-colors"
+                    >
+                        <Edit2 size={14} />
+                    </button>
+                    <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                    className="p-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            )}
+
             <div className="p-5 flex items-center justify-between cursor-pointer select-none" onClick={onToggle}>
                  <div className="flex flex-col">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -430,9 +451,27 @@ interface TimelineViewProps {
     embedded?: boolean;
     isFilterOpen?: boolean;
     onFilterClose?: () => void;
+    isEditing?: boolean;
 }
 
-const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterOpen, onFilterClose }) => {
+const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterOpen, onFilterClose, isEditing = false }) => {
+  const [eventsData, setEventsData] = useState<TimelineItem[]>([]);
+
+  // Load Data
+  useEffect(() => {
+    const saved = localStorage.getItem('timeline_data');
+    if (saved) {
+        setEventsData(JSON.parse(saved));
+    } else {
+        setEventsData(OPHTHALMOLOGY_EVENTS);
+    }
+  }, []);
+
+  // Save Data
+  useEffect(() => {
+    localStorage.setItem('timeline_data', JSON.stringify(eventsData));
+  }, [eventsData]);
+
   const [calendarType, setCalendarType] = useState<'shamsi' | 'lunar'>('shamsi');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -443,6 +482,11 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
   const [activeImage, setActiveImage] = useState<string[] | null>(null);
   
   const [internalFilterOpen, setInternalFilterOpen] = useState(false);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<TimelineItem | null>(null);
+  const [formData, setFormData] = useState<Partial<TimelineItem>>({});
 
   const isSidebarVisible = embedded ? !!isFilterOpen : internalFilterOpen;
   const closeSidebar = embedded ? (onFilterClose || (() => {})) : () => setInternalFilterOpen(false);
@@ -467,24 +511,20 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
   ];
 
   // Dynamic Options based on Calendar Type
-  // 1. Extract unique years from data
-  const uniqueDataYears = new Set(OPHTHALMOLOGY_EVENTS.map(e => {
+  const uniqueDataYears = new Set(eventsData.map(e => {
       const dateStr = calendarType === 'shamsi' ? e.date : e.dateLunar;
       return dateStr.split('/')[0];
   }));
 
-  // 2. Explicitly add future years up to 1408 for Shamsi calendar as requested
   if (calendarType === 'shamsi') {
       ['1403', '1404', '1405', '1406', '1407', '1408'].forEach(y => uniqueDataYears.add(y));
   }
 
   const availableYears = Array.from(uniqueDataYears).sort((a, b) => b.localeCompare(a));
   const yearOptions = availableYears.map(y => ({ label: y, value: y }));
-
-  // 3. Select correct Month List
   const currentMonthOptions = calendarType === 'shamsi' ? PERSIAN_MONTHS : LUNAR_MONTHS;
 
-  const filteredEvents = OPHTHALMOLOGY_EVENTS.filter(item => {
+  const filteredEvents = eventsData.filter(item => {
       const dateStr = calendarType === 'shamsi' ? item.date : item.dateLunar;
       const dateParts = dateStr.split('/');
       const itemYear = dateParts[0];
@@ -500,7 +540,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
       return typeMatch && statusMatch && yearMatch && monthMatch && dayMatch;
   });
 
-  // Group by Year (using selected calendar year)
+  // Group by Year
   const groupedEvents = useMemo(() => {
       const groups: Record<string, TimelineItem[]> = {};
       filteredEvents.forEach(event => {
@@ -512,7 +552,6 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
       return groups;
   }, [filteredEvents, calendarType]);
 
-  // Sort years descending
   const sortedYears = Object.keys(groupedEvents).sort((a, b) => b.localeCompare(a));
 
   const handleToggle = (id: string) => {
@@ -527,6 +566,55 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
     setSelectedDays([]);
   };
 
+  // CRUD
+  const handleAddClick = () => {
+      setEditingItem(null);
+      setFormData({
+          title: '', description: '', date: '', dateLunar: '', type: 'milestone', status: 'done', images: []
+      });
+      setIsModalOpen(true);
+  };
+
+  const handleEditClick = (item: TimelineItem) => {
+      setEditingItem(item);
+      setFormData({ ...item });
+      setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (id: string) => {
+      if(window.confirm('آیا از حذف این رویداد اطمینان دارید؟')) {
+          setEventsData(prev => prev.filter(i => i.id !== id));
+      }
+  };
+
+  const handleSaveForm = () => {
+      if (!formData.title) return alert('عنوان رویداد الزامی است');
+      
+      if (editingItem) {
+          setEventsData(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...formData } as TimelineItem : i));
+      } else {
+          const newId = `ev-${Date.now()}`;
+          const newItem = { ...formData, id: newId, docs: [] } as TimelineItem;
+          setEventsData(prev => [newItem, ...prev]);
+      }
+      setIsModalOpen(false);
+  };
+
+  const handleImageUpload = (url: string) => {
+    setFormData(prev => ({
+        ...prev,
+        images: [...(prev.images || []), url]
+    }));
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setFormData(prev => ({
+        ...prev,
+        images: prev.images?.filter((_, i) => i !== index)
+    }));
+  };
+
+
   return (
     <div className={`${embedded ? 'bg-transparent' : 'bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm'} min-h-[50vh]`}>
       
@@ -539,16 +627,28 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
              <div className="text-slate-500 dark:text-slate-400 text-sm px-4">
                 {filteredEvents.length} رویداد یافت شد
              </div>
+            
+             <div className="flex items-center gap-2">
+                 {isEditing && (
+                     <button 
+                         onClick={handleAddClick}
+                         className="flex items-center gap-2 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold text-sm transition-all shadow-sm"
+                     >
+                         <Plus size={18} />
+                         <span>افزودن رویداد</span>
+                     </button>
+                 )}
 
-             {!embedded && (
-                <button 
-                onClick={() => setInternalFilterOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-xl border border-primary-100 dark:border-primary-800 font-bold text-sm transition-all whitespace-nowrap"
-                >
-                <Filter size={18} />
-                <span>فیلترها</span>
-                </button>
-             )}
+                 {!embedded && (
+                    <button 
+                    onClick={() => setInternalFilterOpen(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-xl border border-primary-100 dark:border-primary-800 font-bold text-sm transition-all whitespace-nowrap"
+                    >
+                    <Filter size={18} />
+                    <span>فیلترها</span>
+                    </button>
+                 )}
+             </div>
          </div>
       </div>
 
@@ -694,6 +794,9 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
                                           onToggle={() => handleToggle(item.id)}
                                           onShowImages={setActiveImage}
                                           calendarType={calendarType}
+                                          isEditing={isEditing}
+                                          onEdit={handleEditClick}
+                                          onDelete={handleDeleteClick}
                                       />
                                   </div>
                               ))}
@@ -716,6 +819,114 @@ const TimelineView: React.FC<TimelineViewProps> = ({ embedded = false, isFilterO
                 </div>
              </div>
           </div>
+       )}
+
+       {/* Modal: Add/Edit */}
+       {isModalOpen && (
+           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+               <div className="relative bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+                   <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                       <h3 className="font-bold text-lg">{editingItem ? 'ویرایش رویداد' : 'افزودن رویداد جدید'}</h3>
+                       <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+                   </div>
+                   
+                   <div className="p-6 overflow-y-auto space-y-4">
+                        {/* Images Upload */}
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">تصاویر</label>
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                {formData.images?.map((img, idx) => (
+                                    <div key={idx} className="relative w-20 h-20 shrink-0">
+                                        <img src={img} className="w-full h-full object-cover rounded-lg border border-slate-200" alt="" />
+                                        <button onClick={() => handleRemoveImage(idx)} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-full transform translate-x-1/2 -translate-y-1/2 shadow-sm"><X size={12}/></button>
+                                    </div>
+                                ))}
+                                <div className="w-20 shrink-0">
+                                    <ImageUploader 
+                                        folder="events"
+                                        onUpload={handleImageUpload}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">عنوان رویداد</label>
+                            <input 
+                              value={formData.title || ''}
+                              onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">تاریخ شمسی</label>
+                                <input 
+                                value={formData.date || ''}
+                                onChange={e => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-center"
+                                placeholder="۱۴۰۳/۰۸/۰۱"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">تاریخ قمری</label>
+                                <input 
+                                value={formData.dateLunar || ''}
+                                onChange={e => setFormData(prev => ({ ...prev, dateLunar: e.target.value }))}
+                                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all text-center"
+                                placeholder="۱۴۴۵/۰۴/۱۰"
+                                />
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">توضیحات</label>
+                            <textarea 
+                              value={formData.description || ''}
+                              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all min-h-[100px]"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">نوع رویداد</label>
+                                <select 
+                                    value={formData.type}
+                                    onChange={e => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none"
+                                >
+                                    <option value="milestone">نقطه عطف</option>
+                                    <option value="equipment">تجهیزات</option>
+                                    <option value="expansion">توسعه</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">وضعیت</label>
+                                <select 
+                                    value={formData.status}
+                                    onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 outline-none"
+                                >
+                                    <option value="done">انجام شده</option>
+                                    <option value="in_progress">در حال انجام</option>
+                                    <option value="future">برنامه آتی</option>
+                                </select>
+                            </div>
+                        </div>
+                   </div>
+
+                   <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-b-2xl flex gap-3">
+                       <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors">انصراف</button>
+                       <button onClick={handleSaveForm} className="flex-[2] py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-primary-500/20 flex items-center justify-center gap-2">
+                           <Save size={18} />
+                           <span>ذخیره تغییرات</span>
+                       </button>
+                   </div>
+               </div>
+           </div>
        )}
     </div>
   );

@@ -6,7 +6,7 @@ import {
   Eye, Ear, Smile, Brain, Heart, Bone, Stethoscope, Baby, Scissors, 
   Image as ImageIcon, Microscope, Pill, Siren, Activity, Layers,
   Banknote, Shield, Laptop, Bean, Briefcase, GraduationCap, BookOpen, Wrench,
-  Plus, Minus, Pin, PanelRightClose
+  Plus, Minus, Pin, PanelRightClose, Settings
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -17,6 +17,7 @@ interface SidebarProps {
   onTogglePin: () => void;
   isMobileMenuOpen: boolean;
   onCloseMobileMenu: () => void;
+  onEditTree?: () => void;
 }
 
 interface TopBarProps {
@@ -393,7 +394,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isPinned, 
   onTogglePin,
   isMobileMenuOpen,
-  onCloseMobileMenu
+  onCloseMobileMenu,
+  onEditTree
 }) => {
   const [activePath, setActivePath] = useState<NavNode[]>([]);
   const [openRootId, setOpenRootId] = useState<string | null>('grp-functional'); 
@@ -463,8 +465,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
             ))}
             
-            <div className="mt-8 py-4 text-center border-t border-slate-100 dark:border-slate-800">
-            <p className="text-[10px] text-slate-400">© ۱۴۰۳ دانشنامه دارالشفاء کوثر</p>
+            <div className="mt-8 pt-4 pb-2 border-t border-slate-100 dark:border-slate-800">
+               {onEditTree && (
+                   <button 
+                    onClick={onEditTree}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors mb-2"
+                   >
+                       <Settings size={16} />
+                       <span className="text-xs font-bold">مدیریت ساختار</span>
+                   </button>
+               )}
+               <p className="text-[10px] text-center text-slate-400">© ۱۴۰۳ دانشنامه دارالشفاء کوثر</p>
             </div>
         </div>
     </>
