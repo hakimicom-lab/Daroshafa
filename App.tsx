@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Globe, Moon, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { WikiArticle, ViewMode, INITIAL_TREE_DATA, NavNode } from './types';
 import { Sidebar, TopBar } from './components/TopNavigation';
 import ArticleView from './components/ArticleView';
@@ -180,9 +180,11 @@ const App: React.FC = () => {
           
           {/* Logo */}
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => handleTopicSelect("صفحه اصلی")}>
-            <div className="w-10 h-10 bg-gradient-to-tr from-primary-600 to-primary-400 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20 group-hover:scale-105 transition-transform duration-300">
-              <Globe size={20} className="text-white" />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="لوگو" 
+              className="w-10 h-10 rounded-full object-contain shadow-lg shadow-primary-500/20 group-hover:scale-105 transition-transform duration-300" 
+            />
             <div className="hidden md:block">
               <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">دانشنامه دارالشفاء</h1>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">مستندات جامع سازمانی</p>
