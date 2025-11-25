@@ -28,6 +28,13 @@ const UniversalStaffList: React.FC<UniversalStaffListProps> = ({ department, isE
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
 
   const fetchStaff = async () => {
+    // If we need to filter by department, but definitions haven't loaded yet, wait.
+    // The useEffect will trigger this again once definitionsLoading becomes false.
+    if (department && department !== 'همه' && department !== 'سرمایه انسانی' && definitionsLoading) {
+        setLoadingStaff(true);
+        return;
+    }
+
     setLoadingStaff(true);
     setFetchError(null);
     try {
@@ -50,21 +57,20 @@ const UniversalStaffList: React.FC<UniversalStaffListProps> = ({ department, isE
                    filteredData = filteredData.filter(s => s.department_id === deptDef.id);
                } else {
                    // Department requested but not found in DB. 
-                   // Safety: Show empty list instead of ALL staff to prevent confusion.
                    console.warn(`Department '${department}' not found in system definitions.`);
                    filteredData = [];
                }
-           } else if (!definitionsLoading) {
-               // Definitions loaded but empty (DB is empty) -> Show empty list
+           } else {
+               // Definitions loaded but empty (DB is empty) or not found
                filteredData = [];
            }
-           // If definitions are still loading, this effect will re-run when they finish, so we wait.
       }
       
       setStaff(filteredData);
     } catch (err: any) {
         console.error('Error fetching staff:', err);
-        setFetchError(err.message || JSON.stringify(err));
+        const msg = err?.message || err?.error_description || (typeof err === 'string' ? err : 'خطا در دریافت اطلاعات');
+        setFetchError(msg);
         setStaff([]);
     } finally {
         setLoadingStaff(false);
@@ -82,7 +88,8 @@ const UniversalStaffList: React.FC<UniversalStaffListProps> = ({ department, isE
         if (error) throw error;
         fetchStaff();
     } catch (err: any) {
-        alert('خطا در حذف: ' + (err.message || JSON.stringify(err)));
+        const msg = err?.message || 'خطای ناشناخته در حذف';
+        alert('خطا در حذف: ' + msg);
     }
   };
   

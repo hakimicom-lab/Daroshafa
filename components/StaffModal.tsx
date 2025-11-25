@@ -65,7 +65,8 @@ const StaffModal: React.FC<StaffModalProps> = ({ staff, onClose, onSaveSuccess, 
       onClose();
     } catch (e: any) {
       console.error(e);
-      alert('خطا در ذخیره سازی: ' + e.message);
+      const msg = e?.message || 'خطای ناشناخته';
+      alert('خطا در ذخیره سازی: ' + msg);
     } finally {
       setLoading(false);
     }

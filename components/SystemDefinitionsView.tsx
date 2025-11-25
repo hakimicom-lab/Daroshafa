@@ -45,7 +45,8 @@ const SystemDefinitionsView: React.FC = () => {
       setFormData({});
     } catch (e: any) {
       console.error(e);
-      alert('خطا در ذخیره سازی: ' + e.message);
+      const msg = e?.message || 'خطای ناشناخته در سرور';
+      alert('خطا در ذخیره سازی: ' + msg);
     } finally {
       setIsSaving(false);
     }
